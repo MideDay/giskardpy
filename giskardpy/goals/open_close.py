@@ -8,13 +8,17 @@ from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
-import giskardpy.casadi_wrapper as cas
+from giskardpy.monitors.joint_monitors import JointGoalReached
+from giskardpy.monitors.payload_monitors import Sleep
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 
 
 class Open(Goal):
     def __init__(self,
                  tip_link: PrefixName,
                  environment_link: PrefixName,
+                 special_door: Optional[bool] = False,
                  goal_joint_state: Optional[float] = None,
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -54,6 +58,19 @@ class Open(Goal):
         else:
             handle_T_tip = cas.TransMatrix(god_map.world.compute_fk(self.handle_link, self.tip_link))
 
+        if special_door:
+            monitor_goal_state = {self.joint_name: goal_joint_state - 0.1}
+
+            door_joint_state_monitor = JointGoalReached(goal_state=monitor_goal_state,
+                                                        threshold=0.05,
+                                                        name=f'{name}_door_joint_monitor')
+            self.add_monitor(door_joint_state_monitor)
+
+            end_condition = cas.logic_or(end_condition, door_joint_state_monitor.get_state_expression())
+
+            god_map.debug_expression_manager.add_debug_expression('joint_state',
+                                                                  door_joint_state_monitor.get_state_expression())
+
         # %% position
         r_P_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_position()
         task = self.create_and_add_task('position')
@@ -85,6 +102,33 @@ class Open(Goal):
                                                        hold_condition=hold_condition,
                                                        end_condition=end_condition,
                                                        name=f'{self.name}/{self.joint_name.short_name}'))
+
+        if goal_joint_state > 1 and special_door:
+            head_pan_joint = 0.0
+            head_tilt_joint = 0.0
+            arm_lift_joint = 0.0
+            arm_flex_joint = 0.0
+            arm_roll_joint = -1.5
+            wrist_flex_joint = -1.5
+            wrist_roll_joint = 0.0
+
+            joint_states = {
+                'head_pan_joint': head_pan_joint,
+                'head_tilt_joint': head_tilt_joint,
+                'arm_lift_joint': arm_lift_joint,
+                'arm_flex_joint': arm_flex_joint,
+                'arm_roll_joint': arm_roll_joint,
+                'wrist_flex_joint': wrist_flex_joint,
+                'wrist_roll_joint': wrist_roll_joint}
+
+            sleep_mon = Sleep(seconds=3,
+                              start_condition=end_condition)
+            self.add_monitor(sleep_mon)
+
+            self.add_constraints_of_goal(JointPositionList(goal_state=joint_states,
+                                                           start_condition=end_condition,
+                                                           hold_condition=hold_condition,
+                                                           end_condition=sleep_mon.get_state_expression()))
 
 
 class Close(Goal):

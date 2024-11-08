@@ -6,6 +6,7 @@ from typing import Dict, Optional, Union
 
 import numpy as np
 
+from giskardpy.exceptions import UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
@@ -58,6 +59,12 @@ class WorldConfig(ABC):
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
         return self.world.groups[group_name].root_link_name
+
+    def check_for_link_name(self, link_name: str):
+        if len(god_map.world.search_for_link_name(link_name)) > 0:
+            return True
+        else:
+            return False
 
     def set_joint_limits(self, limit_map: derivative_map, joint_name: my_string, group_name: Optional[str] = None):
         """
