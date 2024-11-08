@@ -1,40 +1,33 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 import rospy
-from geometry_msgs.msg import Vector3Stamped, PointStamped, PoseStamped
+from geometry_msgs.msg import PointStamped
 
-from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
-from giskardpy.goals.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
-from giskardpy.utils.expression_definition_utils import transform_msg
+from data_types.data_types import PrefixName
+from giskardpy.goals.pointing import Pointing
+from god_map import god_map
+from motion_graph.tasks.task import WEIGHT_BELOW_CA
 
 
 class RealTimePointing(Pointing):
 
     def __init__(self,
-                 tip_link: str,
-                 root_link: str,
+                 tip_link: PrefixName,
+                 root_link: PrefixName,
                  topic_name: str,
-                 tip_group: Optional[str] = None,
-                 root_group: Optional[str] = None,
-                 pointing_axis: Vector3Stamped = None,
+                 pointing_axis: cas.Vector3 = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None,
+                 name: Optional[PrefixName] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
-        initial_goal = PointStamped()
-        initial_goal.header.frame_id = 'base_footprint'
-        initial_goal.point.x = 1
-        initial_goal.point.z = 1
+        initial_goal = cas.Point3()
+        initial_goal.from_xyz(x=1, z=1, reference_frame=PrefixName('base_footprint'))
         super().__init__(tip_link=tip_link,
-                         root_group=root_group,
-                         tip_group=tip_group,
                          max_velocity=max_velocity,
                          weight=weight,
                          goal_point=initial_goal,
@@ -47,5 +40,5 @@ class RealTimePointing(Pointing):
         self.sub = rospy.Subscriber(topic_name, PointStamped, self.cb)
 
     def cb(self, data: PointStamped):
-        data = transform_msg(self.root, data)
+        data = god_map.world.transform(self.root, data)
         self.root_P_goal_point = data
