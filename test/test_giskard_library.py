@@ -17,7 +17,7 @@ from giskardpy.model.links import Link, BoxGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
-from giskardpy.monitors.cartesian_monitors import PoseReached
+from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import suppress_stderr

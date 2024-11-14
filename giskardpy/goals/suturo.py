@@ -7,7 +7,7 @@ import numpy as np
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3, Vector3Stamped, QuaternionStamped, Quaternion
 from std_msgs.msg import ColorRGBA
 
-import giskardpy.utils.tfwrapper as tf
+from giskardpy_ros.ros1 import tfwrapper as tf
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
@@ -16,13 +16,13 @@ from giskardpy.goals.joint_goals import JointPositionList, JointVelocityLimit
 from giskardpy.goals.open_close import Open
 from giskardpy.god_map import god_map
 from giskardpy.model.links import BoxGeometry, LinkGeometry, SphereGeometry, CylinderGeometry
-from giskardpy.monitors.joint_monitors import JointGoalReached
-from giskardpy.monitors.monitors import ExpressionMonitor, LocalMinimumReached, EndMotion
-from giskardpy.monitors.payload_monitors import Sleep
-from giskardpy.suturo_types import GraspTypes
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, LocalMinimumReached, EndMotion
+from giskardpy.motion_graph.monitors.payload_monitors import Sleep
+from giskardpy.data_types.suturo_types import GraspTypes
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
-from giskardpy.utils.logging import loginfo, logwarn
+from giskardpy.middleware import get_middleware
 
 if 'GITHUB_WORKFLOW' not in os.environ:
     pass
@@ -42,7 +42,7 @@ class ObjectGoal(Goal):
 
     def get_object_by_name(self, object_name):
         try:
-            loginfo('trying to get objects with name')
+            get_middleware().loginfo('trying to get objects with name')
 
             object_link = god_map.world.get_link(object_name)
             # TODO: When object has no collision: set size to 0, 0, 0
@@ -54,7 +54,7 @@ class ObjectGoal(Goal):
 
             goal_pose = god_map.world.compute_fk_pose('map', object_name)
 
-            loginfo(f'goal_pose by name: {goal_pose}')
+            get_middleware().loginfo(f'goal_pose by name: {goal_pose}')
 
             # Declare instance of geometry
             if isinstance(object_geometry, BoxGeometry):
@@ -76,11 +76,11 @@ class ObjectGoal(Goal):
             else:
                 raise Exception('Not supported geometry')
 
-            loginfo(f'Got geometry: {object_type}')
+            get_middleware().loginfo(f'Got geometry: {object_type}')
             return goal_pose, object_size
 
         except:
-            loginfo('Could not get geometry from name')
+            get_middleware().loginfo('Could not get geometry from name')
             return None
 
 
@@ -150,12 +150,12 @@ class Reaching(ObjectGoal):
                 god_map.world.search_for_link_name(goal_pose.header.frame_id)
                 self.goal_pose = goal_pose
             except:
-                logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
+                get_middleware().logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
                 self.goal_pose = tf.lookup_pose('map', goal_pose)
 
             self.object_size = object_size
             self.reference_frame = 'base_footprint'
-            logwarn(f'Warning: Object not in giskard world')
+            get_middleware().logwarn(f'Warning: Object not in giskard world')
 
         # TODO: Offsets korrekt berechnen
         # TODO: Weitere Objekte einfügen
@@ -394,7 +394,7 @@ class VerticalMotion(ObjectGoal):
         elif down:
             goal_point_base.pose.position.z -= self.distance
         else:
-            logwarn('no direction given')
+            get_middleware().logwarn('no direction given')
 
         self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link.short_name,
                                                       weight=self.weight,
@@ -569,7 +569,7 @@ class AlignHeight(ObjectGoal):
             god_map.world.search_for_link_name(goal_pose.header.frame_id)
             self.goal_pose = goal_pose
         except:
-            logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
+            get_middleware().logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
             self.goal_pose = tf.lookup_pose('map', goal_pose)
 
         self.object_height = object_height
@@ -836,7 +836,7 @@ class TakePose(Goal):
             wrist_roll_joint = 0.0
 
         else:
-            loginfo(f'{pose_keyword} is not a valid pose')
+            get_middleware().loginfo(f'{pose_keyword} is not a valid pose')
             return
 
         joint_states = {

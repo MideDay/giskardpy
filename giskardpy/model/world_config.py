@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union
 
 import numpy as np
 
-from giskardpy.exceptions import UnknownLinkException
+from giskardpy.data_types.exceptions import UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
