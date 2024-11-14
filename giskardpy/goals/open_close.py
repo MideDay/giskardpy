@@ -2,7 +2,7 @@ from __future__ import division
 
 from typing import Optional
 
-from casadi import casadi as cas
+import casadi_wrapper as cas
 
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
