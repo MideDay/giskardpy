@@ -19,8 +19,14 @@ class LidarPayloadMonitor(PayloadMonitor):
                  frame_id: Optional[str] = 'base_range_sensor_link',
                  laser_distance_threshold_width: Optional[float] = 0.8,
                  laser_distance_threshold: Optional[float] = 0.5,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
         self.topic = topic
         self.laser_scan_analyzer = LaserScanThreshold(laser_frame=frame_id,
                                                       laser_scan_topic=topic,
