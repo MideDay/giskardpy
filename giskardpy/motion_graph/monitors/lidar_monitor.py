@@ -7,8 +7,8 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.monitors.monitors import PayloadMonitor
-from giskardpy.utils import logging
+from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
+from giskardpy.middleware import get_middleware
 
 
 class LidarPayloadMonitor(PayloadMonitor):
@@ -20,7 +20,7 @@ class LidarPayloadMonitor(PayloadMonitor):
                  laser_distance_threshold_width: Optional[float] = 0.8,
                  laser_distance_threshold: Optional[float] = 0.5,
                  start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=False, start_condition=start_condition, run_call_in_thread=False)
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.topic = topic
         self.laser_scan_analyzer = LaserScanThreshold(laser_frame=frame_id,
                                                       laser_scan_topic=topic,
@@ -88,7 +88,7 @@ class LaserScanThreshold:
             if self.thresholds.__len__() > 0:
                 self._publish_laser_thresholds()
             else:
-                logging.logwarn(f'Length of Thresholds is 0: {self.thresholds}')
+                get_middleware().logwarn(f'Length of Thresholds is 0: {self.thresholds}')
                 self.thresholds = None
                 return False
 

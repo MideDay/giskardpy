@@ -6,7 +6,7 @@ from typing import Optional
 import geometry_msgs
 from rospy import wait_for_message
 
-from giskardpy.utils import logging
+from giskardpy.middleware import get_middleware
 
 if 'GITHUB_WORKFLOW' not in os.environ:
     pass
@@ -15,7 +15,7 @@ from geometry_msgs.msg import WrenchStamped
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import PayloadMonitor
+from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
 from giskardpy.suturo_types import ForceTorqueThresholds, ObjectTypes
 
 
@@ -98,7 +98,7 @@ class PayloadForceTorque(PayloadMonitor):
 
                 if abs(rob_torque.vector.y) > torque_threshold:
                     self.state = True
-                    logging.loginfo(f'HIT GWC: TORQUE_Y:{rob_torque.vector.y}')
+                    get_middleware().loginfo(f'HIT GWC: TORQUE_Y:{rob_torque.vector.y}')
                 else:
                     self.state = False
 
@@ -109,7 +109,7 @@ class PayloadForceTorque(PayloadMonitor):
 
                 if abs(rob_force.vector.z) > force_threshold:
                     self.state = True
-                    logging.loginfo(f'HIT GWC: FORCE_Z:{rob_force.vector.z}')
+                    get_middleware().loginfo(f'HIT GWC: FORCE_Z:{rob_force.vector.z}')
                 else:
                     self.state = False
 
@@ -134,7 +134,7 @@ class PayloadForceTorque(PayloadMonitor):
 
                 if abs(rob_force.vector.z) > force_threshold:
                     self.state = True
-                    logging.loginfo(rob_force.vector.z)
+                    get_middleware().loginfo(rob_force.vector.z)
                 else:
                     self.state = False
 
@@ -153,7 +153,7 @@ class PayloadForceTorque(PayloadMonitor):
                 if abs(rob_force.vector.z) >= force_z_threshold:
 
                     self.state = True
-                    logging.loginfo(
+                    get_middleware().loginfo(
                         f'HIT PLACING!: Z:{rob_force.vector.z}')
                 else:
                     self.state = False
@@ -166,7 +166,7 @@ class PayloadForceTorque(PayloadMonitor):
                 if abs(rob_force.vector.z) >= force_z_threshold:
 
                     self.state = True
-                    logging.loginfo(
+                    get_middleware().loginfo(
                         f'HIT CUTLERY!: Z:{rob_force.vector.z}')
                 else:
                     self.state = False
@@ -193,7 +193,7 @@ class PayloadForceTorque(PayloadMonitor):
                 if abs(rob_force.vector.z) >= force_z_threshold:
 
                     self.state = True
-                    logging.loginfo(
+                    get_middleware().loginfo(
                         f'HIT PLACING: Z:{rob_force.vector.z}')
                 else:
                     self.state = False

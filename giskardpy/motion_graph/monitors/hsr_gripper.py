@@ -6,7 +6,7 @@ if 'GITHUB_WORKFLOW' not in os.environ:
     import actionlib
 
     from giskardpy import casadi_wrapper as cas
-    from giskardpy.monitors.monitors import PayloadMonitor
+    from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
 
     from tmc_control_msgs.msg import GripperApplyEffortAction, GripperApplyEffortGoal
 
