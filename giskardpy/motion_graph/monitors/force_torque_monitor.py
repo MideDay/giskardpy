@@ -16,7 +16,7 @@ from geometry_msgs.msg import WrenchStamped
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
-from giskardpy.suturo_types import ForceTorqueThresholds, ObjectTypes
+from giskardpy.data_types.suturo_types import ForceTorqueThresholds, ObjectTypes
 
 
 class PayloadForceTorque(PayloadMonitor):
