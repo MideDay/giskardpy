@@ -21,7 +21,6 @@ from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, LocalMin
 from giskardpy.motion_graph.monitors.payload_monitors import Sleep
 from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 from giskardpy.middleware import get_middleware
 
 if 'GITHUB_WORKFLOW' not in os.environ:
@@ -269,7 +268,7 @@ class GraspObject(ObjectGoal):
         root_goal_point.header.frame_id = self.goal_pose.header.frame_id
         root_goal_point.point = self.goal_pose.pose.position
 
-        self.goal_point = transform_msg(self.reference_link, root_goal_point)
+        self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
 
         if self.grasp == GraspTypes.ABOVE.value:
             self.goal_vertical_axis.vector = self.standard_forward
@@ -385,7 +384,7 @@ class VerticalMotion(ObjectGoal):
 
         start_point_tip = PoseStamped()
         start_point_tip.header.frame_id = self.tip_link.short_name
-        goal_point_base = transform_msg(self.base_footprint, start_point_tip)
+        goal_point_base = god_map.world.transform(self.base_footprint, start_point_tip)
 
         up = ContextActionModes.grasping.value in self.action
         down = ContextActionModes.placing.value in self.action
@@ -402,7 +401,7 @@ class VerticalMotion(ObjectGoal):
                                                       hold_condition=hold_condition,
                                                       end_condition=end_condition))
 
-        goal_point_tip = transform_msg(self.tip_link, goal_point_base)
+        goal_point_tip = god_map.world.transform(self.tip_link, goal_point_base)
         self.goal_point = deepcopy(goal_point_tip)
         # self.root_T_tip_start = god_map.world.compute_fk_np(self.root_link, self.tip_link)
         # self.start_tip_T_current_tip = np.eye(4)
@@ -415,7 +414,7 @@ class VerticalMotion(ObjectGoal):
 
         # root_T_goal = r_T_tip_eval.dot(start_tip_T_current_tip).dot(t_T_g)
 
-        root_T_goal = transform_msg_and_turn_to_expr(self.root_link, self.goal_point, condition=start_condition)
+        root_T_goal = god_map.world.transform(self.root_link, self.goal_point, condition=start_condition)
 
         r_P_g = root_T_goal.to_position()
         r_P_c = root_T_tip.to_position()
@@ -478,14 +477,14 @@ class Retracting(ObjectGoal):
         tip_P_start = PoseStamped()
         tip_P_start.header.frame_id = self.tip_link.short_name
         tip_P_start.pose.orientation.w = 1
-        reference_P_start = transform_msg(self.reference_frame, tip_P_start)
+        reference_P_start = god_map.world.transform(self.reference_frame, tip_P_start)
 
         if self.reference_frame.short_name in self.hand_frames:
             reference_P_start.pose.position.z -= self.distance
         else:
             reference_P_start.pose.position.x -= self.distance
 
-        self.goal_point = transform_msg(self.tip_link, reference_P_start)
+        self.goal_point = god_map.world.transform(self.tip_link, reference_P_start)
         # self.root_T_tip_start = god_map.world.compute_fk_np(self.root_link, self.tip_link)
         # self.start_tip_T_current_tip = np.eye(4)
         self.add_constraints_of_goal(KeepRotationGoal(tip_link='base_footprint',
@@ -511,7 +510,7 @@ class Retracting(ObjectGoal):
 
         # root_T_goal = r_T_tip_eval.dot(start_tip_T_current_tip).dot(t_T_g)
 
-        root_T_goal = transform_msg_and_turn_to_expr(self.root_link, self.goal_point, condition=start_condition)
+        root_T_goal = god_map.world.transform(self.root_link, self.goal_point, condition=start_condition)
 
         r_P_g = root_T_goal.to_position()
         r_P_c = root_T_tip.to_position()
@@ -596,7 +595,7 @@ class AlignHeight(ObjectGoal):
         base_to_tip = god_map.world.compute_fk_pose(self.base_footprint, self.tip_link)
 
         offset = 0.02
-        base_goal_point = transform_msg(self.base_footprint, goal_point)
+        base_goal_point = god_map.world.transform(self.base_footprint, goal_point)
         base_goal_point.point.x = base_to_tip.pose.position.x
         base_goal_point.point.z += (self.object_height / 2) + offset
 
@@ -644,7 +643,7 @@ class AlignHeight(ObjectGoal):
                                                       hold_condition=hold_condition,
                                                       end_condition=end_condition))
 
-        self.goal_point = transform_msg(self.tip_link, base_goal_point)
+        self.goal_point = god_map.world.transform(self.tip_link, base_goal_point)
 
         self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link.short_name,
                                                        tip_link=self.tip_link.short_name,
@@ -1244,13 +1243,13 @@ class GraspBarOffset(Goal):
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
-        bar_center = transform_msg(self.root, bar_center)
-        grasp_axis_offset = transform_msg(self.root, grasp_axis_offset)
+        bar_center = god_map.world.transform(self.root, bar_center)
+        grasp_axis_offset = god_map.world.transform(self.root, grasp_axis_offset)
 
-        tip_grasp_axis = transform_msg(self.tip, tip_grasp_axis)
+        tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
         tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
 
-        bar_axis = transform_msg(self.root, bar_axis)
+        bar_axis = god_map.world.transform(self.root, bar_axis)
         bar_axis.vector = tf.normalize(bar_axis.vector)
 
         self.bar_axis = bar_axis

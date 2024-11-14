@@ -36,17 +36,17 @@ class Goal(ABC):
         self.gripper_tool_frame = None
 
         if god_map.world.robot_name == 'hsrb':
-            self.standard_forward = cas.Vector3(x=1, y=0, z=0)
-            self.standard_left = cas.Vector3(x=0, y=1, z=0)
-            self.standard_up = cas.Vector3(x=0, y=0, z=1)
+            self.standard_forward = cas.Vector3().from_xyz(x=1, y=0, z=0)
+            self.standard_left = cas.Vector3().from_xyz(x=0, y=1, z=0)
+            self.standard_up = cas.Vector3().from_xyz(x=0, y=0, z=1)
 
-            self.gripper_forward = cas.Vector3(x=0, y=0, z=1)
-            self.gripper_left = cas.Vector3(x=0, y=-1, z=0)
-            self.gripper_up = cas.Vector3(x=1, y=0, z=0)
+            self.gripper_forward = cas.Vector3().from_xyz(x=0, y=0, z=1)
+            self.gripper_left = cas.Vector3().from_xyz(x=0, y=-1, z=0)
+            self.gripper_up = cas.Vector3().from_xyz(x=1, y=0, z=0)
 
-            self.base_forward = cas.Vector3(x=1, y=0, z=0)
-            self.base_left = cas.Vector3(x=0, y=1, z=0)
-            self.base_up = cas.Vector3(x=0, y=0, z=1)
+            self.base_forward = cas.Vector3().from_xyz(x=1, y=0, z=0)
+            self.base_left = cas.Vector3().from_xyz(x=0, y=1, z=0)
+            self.base_up = cas.Vector3().from_xyz(x=0, y=0, z=1)
 
             self.gripper_tool_frame = 'hand_gripper_tool_frame'
 
