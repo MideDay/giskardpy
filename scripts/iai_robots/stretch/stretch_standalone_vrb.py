@@ -5,7 +5,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.stretch import StretchCollisionAvoidanceConfig, StretchStandaloneInterface
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.model.ros_msg_visualization import VisualizationMode
 
 if __name__ == '__main__':
