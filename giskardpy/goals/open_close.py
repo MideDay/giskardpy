@@ -2,12 +2,10 @@ from __future__ import division
 
 from typing import Optional
 
-import casadi_wrapper as cas
-
+import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
@@ -58,7 +56,7 @@ class Open(Goal):
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                start_condition)
         else:
-            handle_T_tip = god_map.world.compute_fk(self.handle_link, self.tip_link)
+            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk(self.handle_link, self.tip_link))
 
         if special_door:
             monitor_goal_state = {self.joint_name: goal_joint_state - 0.1}
