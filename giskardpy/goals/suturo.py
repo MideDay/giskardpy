@@ -52,7 +52,7 @@ class ObjectGoal(Goal):
             else:
                 object_geometry: LinkGeometry = object_link.collisions[0]
 
-            goal_pose = god_map.world.compute_fk_pose('map', object_name)
+            goal_pose = god_map.world.compute_fk('map', object_name)
 
             get_middleware().loginfo(f'goal_pose by name: {goal_pose}')
 
@@ -98,8 +98,6 @@ class Reaching(ObjectGoal):
                  object_shape: Optional[str] = None,
                  goal_pose: Optional[cas.TransMatrix] = None,
                  object_size: Optional[cas.Vector3] = None,  # change to cas.Vector3
-                 # root_link: Optional[str] = None,
-                 # tip_link: Optional[str] = None,
                  velocity: float = 0.2,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: w.Expression = w.TrueSymbol,
@@ -209,8 +207,8 @@ class GraspObject(ObjectGoal):
                  grasp: str = 'front',
                  name: Optional[str] = None,
                  reference_frame_alignment: Optional[str] = None,
-                 root_link: Optional[str] = None,
-                 tip_link: Optional[str] = None,
+                 root_link: Optional[PrefixName] = None,
+                 tip_link: Optional[PrefixName] = None,
                  velocity: float = 0.2,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: w.Expression = w.TrueSymbol,
@@ -260,18 +258,17 @@ class GraspObject(ObjectGoal):
         self.weight = weight
 
         self.goal_frontal_axis = cas.Vector3()
-        self.goal_frontal_axis.reference_frame = self.reference_link.short_name
+        self.goal_frontal_axis.reference_frame = self.reference_link
 
         self.tip_frontal_axis = cas.Vector3()
-        self.tip_frontal_axis.reference_frame = self.tip_link.short_name
+        self.tip_frontal_axis.reference_frame = self.tip_link
 
         self.goal_vertical_axis = cas.Vector3()
-        self.goal_vertical_axis.reference_frame = self.reference_link.short_name
+        self.goal_vertical_axis.reference_frame = self.reference_link
 
         self.tip_vertical_axis = cas.Vector3()
-        self.tip_vertical_axis.reference_frame = self.tip_link.short_name
+        self.tip_vertical_axis.reference_frame = self.tip_link
 
-        root_goal_point = cas.Point3()
         root_goal_point = self.goal_pose.to_position()
 
         self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
@@ -279,18 +276,18 @@ class GraspObject(ObjectGoal):
         if self.grasp == GraspTypes.ABOVE.value:
             self.goal_vertical_axis.vector = self.standard_forward
             self.goal_frontal_axis.vector = multiply_vector(self.standard_up, -1)
-            self.goal_point.point.z += self.offsets.z
+            self.goal_point.z += self.offsets.z
 
         elif self.grasp == GraspTypes.BELOW.value:
             self.goal_vertical_axis.vector = multiply_vector(self.standard_forward, -1)
             self.goal_frontal_axis.vector = self.standard_up
-            self.goal_point.point.z -= self.offsets.z
+            self.goal_point.z -= self.offsets.z
 
         elif self.grasp == GraspTypes.FRONT.value:
             self.goal_vertical_axis.vector = self.standard_up
             self.goal_frontal_axis.vector = self.base_forward
 
-            self.goal_point.point.z -= 0.01
+            self.goal_point.z -= 0.01
 
         elif self.grasp == GraspTypes.LEFT.value:
             self.goal_frontal_axis.vector = self.gripper_left
@@ -309,8 +306,8 @@ class GraspObject(ObjectGoal):
         self.tip_frontal_axis.vector = self.gripper_forward
 
         # Position
-        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link.short_name,
-                                                       tip_link=self.tip_link.short_name,
+        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link,
+                                                       tip_link=self.tip_link,
                                                        goal_point=self.goal_point,
                                                        reference_velocity=self.velocity,
                                                        weight=self.weight,
@@ -320,8 +317,9 @@ class GraspObject(ObjectGoal):
 
         # FIXME you can use orientation goal instead of two align planes
         # Align vertical
-        self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link.short_name,
-                                                 tip_link=self.tip_link.short_name,
+        self.add_constraints_of_goal(AlignPlanes(name='APlanes1',
+                                                 root_link=self.root_link,
+                                                 tip_link=self.tip_link,
                                                  goal_normal=self.goal_vertical_axis,
                                                  tip_normal=self.tip_vertical_axis,
                                                  reference_velocity=self.velocity,
@@ -331,8 +329,9 @@ class GraspObject(ObjectGoal):
                                                  end_condition=end_condition))
 
         # Align frontal
-        self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link.short_name,
-                                                 tip_link=self.tip_link.short_name,
+        self.add_constraints_of_goal(AlignPlanes(name='APlanes2',
+                                                 root_link=self.root_link,
+                                                 tip_link=self.tip_link,
                                                  goal_normal=self.goal_frontal_axis,
                                                  tip_normal=self.tip_frontal_axis,
                                                  reference_velocity=self.velocity,
@@ -972,14 +971,14 @@ class KeepRotationGoal(Goal):
 
         super().__init__(name)
 
-        self.tip_link = tip_link
+        self.tip_link = god_map.world.search_for_link_name(tip_link)
         self.weight = weight
 
         tip_orientation = cas.RotationMatrix()
         tip_orientation.reference_frame = self.tip_link
 
         self.add_constraints_of_goal(CartesianOrientation(root_link=PrefixName('map'),
-                                                          tip_link=giskard_msgs.LinkName(self.tip_link),
+                                                          tip_link=self.tip_link,
                                                           goal_orientation=tip_orientation,
                                                           weight=self.weight,
                                                           start_condition=start_condition,
