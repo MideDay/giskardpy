@@ -87,15 +87,17 @@ class ObjectGoal(Goal):
 
 class Reaching(ObjectGoal):
     def __init__(self,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  grasp: str,
                  align: str,
                  name: str = None,
                  object_name: Optional[str] = None,
                  object_shape: Optional[str] = None,
                  goal_pose: Optional[PoseStamped] = None,
-                 object_size: Optional[Vector3] = None,
-                 root_link: Optional[str] = None,
-                 tip_link: Optional[str] = None,
+                 object_size: Optional[Vector3] = None, # change to cas.Vector3
+                 #root_link: Optional[str] = None,
+                 #tip_link: Optional[str] = None,
                  velocity: float = 0.2,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: w.Expression = w.TrueSymbol,
