@@ -45,6 +45,7 @@ class AlignPlanes(Goal):
         self.root_V_root_normal.scale(1)
 
         if name is None:
+            # FIXME: Warum willst du nicht?
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
                    f'_X:{self.tip_V_tip_normal.x:.3f}' \
                    f'_Y:{self.tip_V_tip_normal.y:.3f}' \

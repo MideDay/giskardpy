@@ -52,7 +52,7 @@ class ObjectGoal(Goal):
             else:
                 object_geometry: LinkGeometry = object_link.collisions[0]
 
-            goal_pose = god_map.world.compute_fk('map', object_name)
+            goal_pose = god_map.world.compute_fk('map', god_map.world.search_for_link_name(object_name))
 
             get_middleware().loginfo(f'goal_pose by name: {goal_pose}')
 
@@ -388,15 +388,15 @@ class VerticalMotion(ObjectGoal):
         self.action = action
 
         start_point_tip = cas.TransMatrix()
-        start_point_tip.reference_frame = self.tip_link.short_name
+        start_point_tip.reference_frame = self.tip_link
         goal_point_base = god_map.world.transform(self.base_footprint, start_point_tip)
 
         up = ContextActionModes.grasping.value in self.action
         down = ContextActionModes.placing.value in self.action
         if up:
-            goal_point_base.pose.position.z += self.distance
+            goal_point_base.z += self.distance
         elif down:
-            goal_point_base.pose.position.z -= self.distance
+            goal_point_base.z -= self.distance
         else:
             get_middleware().logwarn('no direction given')
 
@@ -419,7 +419,7 @@ class VerticalMotion(ObjectGoal):
 
         # root_T_goal = r_T_tip_eval.dot(start_tip_T_current_tip).dot(t_T_g)
 
-        root_T_goal = god_map.world.transform(self.root_link, self.goal_point, condition=start_condition)
+        root_T_goal = god_map.world.transform(self.root_link, self.goal_point)
 
         r_P_g = root_T_goal.to_position()
         r_P_c = root_T_tip.to_position()
@@ -480,13 +480,13 @@ class Retracting(ObjectGoal):
         self.hand_frames = [self.gripper_tool_frame, 'hand_palm_link']
 
         tip_P_start = cas.TransMatrix()
-        tip_P_start.reference_frame = self.tip_link.short_name
+        tip_P_start.reference_frame = self.tip_link
         reference_P_start = god_map.world.transform(self.reference_frame, tip_P_start)
 
         if self.reference_frame.short_name in self.hand_frames:
-            reference_P_start.pose.position.z -= self.distance
+            reference_P_start.z -= self.distance
         else:
-            reference_P_start.pose.position.x -= self.distance
+            reference_P_start.x -= self.distance
 
         self.goal_point = god_map.world.transform(self.tip_link, reference_P_start)
         # self.root_T_tip_start = god_map.world.compute_fk_np(self.root_link, self.tip_link)
@@ -514,7 +514,7 @@ class Retracting(ObjectGoal):
 
         # root_T_goal = r_T_tip_eval.dot(start_tip_T_current_tip).dot(t_T_g)
 
-        root_T_goal = god_map.world.transform(self.root_link, self.goal_point, condition=start_condition)
+        root_T_goal = god_map.world.transform(self.root_link, self.goal_point)
 
         r_P_g = root_T_goal.to_position()
         r_P_c = root_T_tip.to_position()
@@ -569,7 +569,7 @@ class AlignHeight(ObjectGoal):
             object_height = object_size.z
 
         try:
-            god_map.world.search_for_link_name(goal_pose.header.frame_id)
+            god_map.world.search_for_link_name(goal_pose.reference_frame.short_name)
             self.goal_pose = goal_pose
         except:
             get_middleware().logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
@@ -592,52 +592,52 @@ class AlignHeight(ObjectGoal):
 
         self.base_footprint = god_map.world.search_for_link_name('base_footprint')
 
-        goal_point = cas.Point3()
-        goal_point.reference_frame = self.goal_pose.header.frame_id
-        goal_point.point = self.goal_pose.pose.position
+        goal_point = self.goal_pose.to_position()
 
-        base_to_tip = god_map.world.compute_fk_pose(self.base_footprint, self.tip_link)
+        base_to_tip = god_map.world.compute_fk(self.base_footprint, self.tip_link)
 
         offset = 0.02
         base_goal_point = god_map.world.transform(self.base_footprint, goal_point)
-        base_goal_point.point.x = base_to_tip.pose.position.x
-        base_goal_point.point.z += (self.object_height / 2) + offset
+        base_goal_point.x = base_to_tip.x
+        base_goal_point.z += (self.object_height / 2) + offset
 
         if self.from_above:
             # Tip facing downwards
-            base_goal_point.point.z += 0.05
+            base_goal_point.z += 0.05
 
             base_V_g = cas.Vector3().from_xyz(0, 0, -1)
-            base_V_g.reference_frame = self.base_footprint.short_name
+            base_V_g.reference_frame = self.base_footprint
 
             tip_V_g = cas.Vector3().from_xyz(self.gripper_forward.x, self.gripper_forward.y, self.gripper_forward.z)
-            tip_V_g.reference_frame = self.tip_link.short_name
+            tip_V_g.reference_frame = self.tip_link
 
             base_V_x = cas.Vector3().from_xyz(x=1)
-            base_V_x.reference_frame = self.base_footprint.short_name
+            base_V_x.reference_frame = self.base_footprint
 
             tip_V_x = cas.Vector3().from_xyz(x=1)
-            tip_V_x.reference_frame = self.tip_link.short_name
+            tip_V_x.reference_frame = self.tip_link
 
-            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link.short_name,
-                                                     tip_link=self.tip_link.short_name,
+            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link,
+                                                     tip_link=self.tip_link,
                                                      goal_normal=base_V_g,
-                                                     tip_normal=tip_V_g))
+                                                     tip_normal=tip_V_g,
+                                                     name='APlane1'))
 
-            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link.short_name,
-                                                     tip_link=self.tip_link.short_name,
+            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link,
+                                                     tip_link=self.tip_link,
                                                      goal_normal=base_V_x,
-                                                     tip_normal=tip_V_x))
+                                                     tip_normal=tip_V_x,
+                                                     name='APlane2'))
 
         else:
             # Tip facing frontal
-            self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link.short_name,
+            self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link,
                                                           weight=self.weight,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
                                                           end_condition=end_condition))
 
-        self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.base_footprint.short_name,
+        self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.base_footprint,
                                                       weight=self.weight,
                                                       start_condition=start_condition,
                                                       hold_condition=hold_condition,
@@ -645,8 +645,8 @@ class AlignHeight(ObjectGoal):
 
         self.goal_point = god_map.world.transform(self.tip_link, base_goal_point)
 
-        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link.short_name,
-                                                       tip_link=self.tip_link.short_name,
+        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link,
+                                                       tip_link=self.tip_link,
                                                        goal_point=self.goal_point,
                                                        reference_velocity=self.velocity,
                                                        weight=self.weight,
