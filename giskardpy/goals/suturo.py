@@ -3,27 +3,26 @@ from copy import deepcopy
 from enum import Enum
 from typing import Optional, Dict
 
+import giskard_msgs.msg as giskard_msgs
 import numpy as np
-from geometry_msgs.msg import PoseStamped, PointStamped, Vector3, Vector3Stamped, QuaternionStamped, Quaternion
-from std_msgs.msg import ColorRGBA
-
 from giskardpy_ros.ros1 import tfwrapper as tf
+from std_msgs.msg import ColorRGBA
 
 from data_types.data_types import PrefixName
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
+from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.joint_goals import JointPositionList, JointVelocityLimit
 from giskardpy.goals.open_close import Open
 from giskardpy.god_map import god_map
+from giskardpy.middleware import get_middleware
 from giskardpy.model.links import BoxGeometry, LinkGeometry, SphereGeometry, CylinderGeometry
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, LocalMinimumReached, EndMotion
 from giskardpy.motion_graph.monitors.payload_monitors import Sleep
-from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.middleware import get_middleware
 
 if 'GITHUB_WORKFLOW' not in os.environ:
     pass
@@ -62,17 +61,20 @@ class ObjectGoal(Goal):
                 object_type = 'box'
                 object_geometry: BoxGeometry = object_geometry
                 # FIXME use expression instead of vector3, unless its really a vector
-                object_size = Vector3(object_geometry.width, object_geometry.depth, object_geometry.height)
+                object_size = cas.Vector3.from_xyz(x=object_geometry.width, y=object_geometry.depth,
+                                                   z=object_geometry.height)
 
             elif isinstance(object_geometry, CylinderGeometry):
                 object_type = 'cylinder'
                 object_geometry: CylinderGeometry = object_geometry
-                object_size = Vector3(object_geometry.radius, object_geometry.radius, object_geometry.height)
+                object_size = cas.Vector3.from_xyz(x=object_geometry.radius, y=object_geometry.radius,
+                                                   z=object_geometry.height)
 
             elif isinstance(object_geometry, SphereGeometry):
                 object_type = 'sphere'
                 object_geometry: SphereGeometry = object_geometry
-                object_size = Vector3(object_geometry.radius, object_geometry.radius, object_geometry.radius)
+                object_size = cas.Vector3.from_xyz(x=object_geometry.radius, y=object_geometry.radius,
+                                                   z=object_geometry.radius)
 
             else:
                 raise Exception('Not supported geometry')
@@ -94,10 +96,10 @@ class Reaching(ObjectGoal):
                  name: str = None,
                  object_name: Optional[str] = None,
                  object_shape: Optional[str] = None,
-                 goal_pose: Optional[PoseStamped] = None,
-                 object_size: Optional[Vector3] = None, # change to cas.Vector3
-                 #root_link: Optional[str] = None,
-                 #tip_link: Optional[str] = None,
+                 goal_pose: Optional[cas.TransMatrix] = None,
+                 object_size: Optional[cas.Vector3] = None,  # change to cas.Vector3
+                 # root_link: Optional[str] = None,
+                 # tip_link: Optional[str] = None,
                  velocity: float = 0.2,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: w.Expression = w.TrueSymbol,
@@ -139,7 +141,7 @@ class Reaching(ObjectGoal):
         self.tip_link_name = tip_link
         self.velocity = velocity
         self.weight = weight
-        self.offsets = Vector3(0, 0, 0)
+        self.offsets = cas.Vector3.from_xyz(0, 0, 0)
         self.careful = False
         self.object_in_world = goal_pose is None
 
@@ -150,10 +152,10 @@ class Reaching(ObjectGoal):
 
         else:
             try:
-                god_map.world.search_for_link_name(goal_pose.header.frame_id)
+                god_map.world.search_for_link_name(goal_pose.reference_frame)
                 self.goal_pose = goal_pose
             except:
-                get_middleware().logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
+                get_middleware().logwarn(f'Couldn\'t find {goal_pose.reference_frame}. Searching in tf.')
                 self.goal_pose = tf.lookup_pose('map', goal_pose)
 
             self.object_size = object_size
@@ -163,7 +165,7 @@ class Reaching(ObjectGoal):
         # TODO: Offsets korrekt berechnen
         # TODO: Weitere Objekte einfügen
         if self.object_shape == 'sphere' or self.object_shape == 'cylinder':
-            self.offsets = Vector3(self.object_size.x, self.object_size.x, self.object_size.z)
+            self.offsets = cas.Vector3.from_xyz(x=self.object_size.x, y=self.object_size.x, z=self.object_size.z)
 
         # TODO: fine tune and add correct object names
         elif self.object_name == 'plate':
@@ -177,9 +179,10 @@ class Reaching(ObjectGoal):
 
         else:
             if self.object_in_world:
-                self.offsets = Vector3(-self.object_size.x / 2, self.object_size.y / 2, self.object_size.z / 2)
+                self.offsets = cas.Vector3.from_xyz(-self.object_size.x / 2, self.object_size.y / 2,
+                                                    self.object_size.z / 2)
             else:
-                self.offsets = Vector3(max(min(0.08, self.object_size.x / 2), 0.05), 0, 0)
+                self.offsets = cas.Vector3.from_xyz(max(min(0.08, self.object_size.x.to_np() / 2), 0.05), 0, 0)
 
         if all(self.grasp != member.value for member in GraspTypes):
             raise Exception(f"Unknown grasp value: {grasp}")
@@ -200,9 +203,9 @@ class Reaching(ObjectGoal):
 
 class GraspObject(ObjectGoal):
     def __init__(self,
-                 goal_pose: PoseStamped,
+                 goal_pose: cas.TransMatrix,
                  align: str,
-                 offsets: Vector3 = Vector3(0, 0, 0),
+                 offsets: cas.Vector3 = cas.Vector3.from_xyz(0, 0, 0),
                  grasp: str = 'front',
                  name: Optional[str] = None,
                  reference_frame_alignment: Optional[str] = None,
@@ -256,21 +259,20 @@ class GraspObject(ObjectGoal):
         self.velocity = velocity
         self.weight = weight
 
-        self.goal_frontal_axis = Vector3Stamped()
-        self.goal_frontal_axis.header.frame_id = self.reference_link.short_name
+        self.goal_frontal_axis = cas.Vector3()
+        self.goal_frontal_axis.reference_frame = self.reference_link.short_name
 
-        self.tip_frontal_axis = Vector3Stamped()
-        self.tip_frontal_axis.header.frame_id = self.tip_link.short_name
+        self.tip_frontal_axis = cas.Vector3()
+        self.tip_frontal_axis.reference_frame = self.tip_link.short_name
 
-        self.goal_vertical_axis = Vector3Stamped()
-        self.goal_vertical_axis.header.frame_id = self.reference_link.short_name
+        self.goal_vertical_axis = cas.Vector3()
+        self.goal_vertical_axis.reference_frame = self.reference_link.short_name
 
-        self.tip_vertical_axis = Vector3Stamped()
-        self.tip_vertical_axis.header.frame_id = self.tip_link.short_name
+        self.tip_vertical_axis = cas.Vector3()
+        self.tip_vertical_axis.reference_frame = self.tip_link.short_name
 
-        root_goal_point = PointStamped()
-        root_goal_point.header.frame_id = self.goal_pose.header.frame_id
-        root_goal_point.point = self.goal_pose.pose.position
+        root_goal_point = cas.Point3()
+        root_goal_point = self.goal_pose.to_position()
 
         self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
 
@@ -386,8 +388,8 @@ class VerticalMotion(ObjectGoal):
         self.base_footprint = god_map.world.search_for_link_name('base_footprint')
         self.action = action
 
-        start_point_tip = PoseStamped()
-        start_point_tip.header.frame_id = self.tip_link.short_name
+        start_point_tip = cas.TransMatrix()
+        start_point_tip.reference_frame = self.tip_link.short_name
         goal_point_base = god_map.world.transform(self.base_footprint, start_point_tip)
 
         up = ContextActionModes.grasping.value in self.action
@@ -478,9 +480,8 @@ class Retracting(ObjectGoal):
         self.weight = weight
         self.hand_frames = [self.gripper_tool_frame, 'hand_palm_link']
 
-        tip_P_start = PoseStamped()
-        tip_P_start.header.frame_id = self.tip_link.short_name
-        tip_P_start.pose.orientation.w = 1
+        tip_P_start = cas.TransMatrix()
+        tip_P_start.reference_frame = self.tip_link.short_name
         reference_P_start = god_map.world.transform(self.reference_frame, tip_P_start)
 
         if self.reference_frame.short_name in self.hand_frames:
@@ -533,7 +534,7 @@ class AlignHeight(ObjectGoal):
                  from_above: bool = False,
                  name: str = None,
                  object_name: Optional[str] = None,
-                 goal_pose: Optional[PoseStamped] = None,
+                 goal_pose: Optional[cas.TransMatrix] = None,
                  object_height: float = 0.0,
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
@@ -592,8 +593,8 @@ class AlignHeight(ObjectGoal):
 
         self.base_footprint = god_map.world.search_for_link_name('base_footprint')
 
-        goal_point = PointStamped()
-        goal_point.header.frame_id = self.goal_pose.header.frame_id
+        goal_point = cas.Point3()
+        goal_point.reference_frame = self.goal_pose.header.frame_id
         goal_point.point = self.goal_pose.pose.position
 
         base_to_tip = god_map.world.compute_fk_pose(self.base_footprint, self.tip_link)
@@ -607,21 +608,17 @@ class AlignHeight(ObjectGoal):
             # Tip facing downwards
             base_goal_point.point.z += 0.05
 
-            base_V_g = Vector3Stamped()
-            base_V_g.header.frame_id = self.base_footprint.short_name
-            base_V_g.vector.z = -1
+            base_V_g = cas.Vector3().from_xyz(0, 0, -1)
+            base_V_g.reference_frame = self.base_footprint.short_name
 
-            tip_V_g = Vector3Stamped()
-            tip_V_g.header.frame_id = self.tip_link.short_name
-            tip_V_g.vector = self.gripper_forward
+            tip_V_g = cas.Vector3().from_xyz(self.gripper_forward.x, self.gripper_forward.y, self.gripper_forward.z)
+            tip_V_g.reference_frame = self.tip_link.short_name
 
-            base_V_x = Vector3Stamped()
-            base_V_x.header.frame_id = self.base_footprint.short_name
-            base_V_x.vector.x = 1
+            base_V_x = cas.Vector3().from_xyz(x=1)
+            base_V_x.reference_frame = self.base_footprint.short_name
 
-            tip_V_x = Vector3Stamped()
-            tip_V_x.header.frame_id = self.tip_link.short_name
-            tip_V_x.vector.x = 1
+            tip_V_x = cas.Vector3().from_xyz(x=1)
+            tip_V_x.reference_frame = self.tip_link.short_name
 
             self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link.short_name,
                                                      tip_link=self.tip_link.short_name,
@@ -662,7 +659,7 @@ class AlignHeight(ObjectGoal):
 class Placing(ObjectGoal):
 
     def __init__(self,
-                 goal_pose: PoseStamped,
+                 goal_pose: cas.TransMatrix,
                  align: str,
                  name: str = None,
                  root_link: Optional[str] = None,
@@ -872,7 +869,9 @@ class Mixing(Goal):
         :param mixing_time: States how long this goal should be executed.
         :param weight: weight of this goal
         """
-        super().__init__()
+        if name is None:
+            name = 'Mixing'
+        super().__init__(name=name)
 
         self.weight = weight
 
@@ -928,7 +927,9 @@ class JointRotationGoalContinuous(Goal):
         :param target_speed: execution speed of this goal. Adjust when the trajectory is not executed right
         :param period_length: length of the period that should be executed. Adjust when the trajectory is not executed right.
         """
-        super().__init__()
+        if name is None:
+            name = 'JointRotationGoalContinuous'
+        super().__init__(name=name)
         self.joint = god_map.world.search_for_joint_name(joint_name)
         self.target_speed = target_speed
         self.trajectory_length = trajectory_length
@@ -942,8 +943,8 @@ class JointRotationGoalContinuous(Goal):
 
         joint_goal = self.joint_center + (w.cos(time * np.pi * self.period_length) * self.joint_range)
 
-        self.add_debug_expr(f'{self.joint.short_name}_goal', joint_goal)
-        self.add_debug_expr(f'{self.joint.short_name}_position', joint_position)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.joint.short_name}_goal', joint_goal)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.joint.short_name}_position', joint_position)
 
         self.add_position_constraint(expr_current=joint_position,
                                      expr_goal=joint_goal,
@@ -974,12 +975,11 @@ class KeepRotationGoal(Goal):
         self.tip_link = tip_link
         self.weight = weight
 
-        zero_quaternion = Quaternion(x=0, y=0, z=0, w=1)
-        tip_orientation = QuaternionStamped(quaternion=zero_quaternion)
-        tip_orientation.header.frame_id = self.tip_link
+        tip_orientation = cas.RotationMatrix()
+        tip_orientation.reference_frame = self.tip_link
 
-        self.add_constraints_of_goal(CartesianOrientation(root_link='map',
-                                                          tip_link=self.tip_link,
+        self.add_constraints_of_goal(CartesianOrientation(root_link=PrefixName('map'),
+                                                          tip_link=giskard_msgs.LinkName(self.tip_link),
                                                           goal_orientation=tip_orientation,
                                                           weight=self.weight,
                                                           start_condition=start_condition,
@@ -1098,7 +1098,7 @@ class MoveAroundDishwasher(Goal):
         """
         Adds two Points to move around the door of the dishwasher
 
-        :param handle_frame_id: full frame id of the dishwasher door handle
+        :param handle_name: full frame id of the dishwasher door handle
         :param root_link: root link of the kinematic chain
         :param tip_link: tip link of the kinematic chain
         :param reference_linear_velocity: m/s
@@ -1131,10 +1131,10 @@ class MoveAroundDishwasher(Goal):
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
 
-        door_P_handle = god_map.world.compute_fk_pose(door_hinge_frame_id, self.handle_frame_id).pose.position
-        temp_point = np.asarray([door_P_handle.x, door_P_handle.y, door_P_handle.z])
+        door_P_handle = god_map.world.compute_fk(door_hinge_frame_id, self.handle_frame_id).to_position()
+        temp_point = door_P_handle.to_np()
         # axis pointing in the direction of handle frame from door joint frame
-        direction_axis = np.argmax(abs(temp_point))
+        direction_axis = np.argmax(abs(temp_point[0:3]))
 
         multipliers = [(11 / 10, -0.7, 'down_short'),
                        (7 / 5, -0.3, 'down_long'),
@@ -1172,11 +1172,9 @@ class MoveAroundDishwasher(Goal):
 
             if old_position_monitor is None:
                 position_monitor = ExpressionMonitor(name=goal_name,
-                                                     stay_true=True,
                                                      start_condition=w.TrueSymbol)
             else:
                 position_monitor = ExpressionMonitor(name=goal_name,
-                                                     stay_true=True,
                                                      start_condition=old_position_monitor.get_state_expression())
 
             distance_to_point = cas.euclidean_distance(root_P_tip, root_P_top)
@@ -1209,11 +1207,11 @@ class GraspBarOffset(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 tip_grasp_axis: Vector3Stamped,
-                 bar_center: PointStamped,
-                 bar_axis: Vector3Stamped,
+                 tip_grasp_axis: cas.Vector3,
+                 bar_center: cas.Point3,
+                 bar_axis: cas.Vector3,
                  bar_length: float,
-                 grasp_axis_offset: Vector3Stamped,
+                 grasp_axis_offset: cas.Vector3,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
@@ -1251,10 +1249,10 @@ class GraspBarOffset(Goal):
         grasp_axis_offset = god_map.world.transform(self.root, grasp_axis_offset)
 
         tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
-        tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
+        tip_grasp_axis.vector = tip_grasp_axis.norm()
 
         bar_axis = god_map.world.transform(self.root, bar_axis)
-        bar_axis.vector = tf.normalize(bar_axis.vector)
+        bar_axis.vector = bar_axis.norm()
 
         self.bar_axis = bar_axis
         self.tip_grasp_axis = tip_grasp_axis
@@ -1309,8 +1307,8 @@ def check_context_element(name: str,
             return context[name]
 
 
-def multiply_vector(vec: Vector3,
+def multiply_vector(vec: cas.Vector3,
                     number: int):
-    return Vector3(vec.x * number, vec.y * number, vec.z * number)
+    return cas.Vector3.from_xyz(vec.x * number, vec.y * number, vec.z * number)
 
 # TODO: Make Cartesian Orientation from two alignplanes
