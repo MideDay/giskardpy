@@ -1231,6 +1231,11 @@ class MoveAroundDishwasher(Goal):
 
 
 class GraspBarOffset(Goal):
+    bar_axis: cas.Vector3
+    tip_grasp_axis: cas.Vector3
+    bar_center: cas.Point3
+    grasp_axis_offset: cas.Vector3
+
     def __init__(self,
                  root_link: str,
                  tip_link: str,
@@ -1276,10 +1281,10 @@ class GraspBarOffset(Goal):
         grasp_axis_offset = god_map.world.transform(self.root, grasp_axis_offset)
 
         tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
-        tip_grasp_axis = tip_grasp_axis.norm()
+        tip_grasp_axis = tip_grasp_axis / tip_grasp_axis.norm()
 
         bar_axis = god_map.world.transform(self.root, bar_axis)
-        bar_axis = bar_axis.norm()
+        bar_axis = bar_axis / bar_axis.norm()
 
         self.bar_axis = bar_axis
         self.tip_grasp_axis = tip_grasp_axis
@@ -1290,12 +1295,13 @@ class GraspBarOffset(Goal):
         self.reference_angular_velocity = reference_angular_velocity
         self.weight = weight
 
-        root_V_bar_axis = cas.Vector3(self.bar_axis)
-        tip_V_tip_grasp_axis = cas.Vector3(self.tip_grasp_axis)
-        root_P_bar_center = cas.Point3(self.bar_center)
-        root_V_bar_offset = cas.Vector3(self.grasp_axis_offset)
+        root_V_bar_axis = self.bar_axis
+        tip_V_tip_grasp_axis = self.tip_grasp_axis
+        root_P_bar_center = self.bar_center
+        root_V_bar_offset = self.grasp_axis_offset
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
+
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
         task = self.create_and_add_task('grasp bar')
