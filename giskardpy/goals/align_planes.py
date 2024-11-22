@@ -6,7 +6,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.middleware import get_middleware
 from giskardpy.god_map import god_map
-from symbol_manager import symbol_manager
+from giskardpy.symbol_manager import symbol_manager
 
 
 class AlignPlanes(Goal):
