@@ -6,6 +6,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.middleware import get_middleware
 from giskardpy.god_map import god_map
+from symbol_manager import symbol_manager
 
 
 class AlignPlanes(Goal):
@@ -45,11 +46,11 @@ class AlignPlanes(Goal):
         self.root_V_root_normal.scale(1)
 
         if name is None:
-            # FIXME: Warum willst du nicht?
+            v = symbol_manager.evaluate_expr(self.tip_V_tip_normal)
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
-                   f'_X:{self.tip_V_tip_normal.x:.3f}' \
-                   f'_Y:{self.tip_V_tip_normal.y:.3f}' \
-                   f'_Z:{self.tip_V_tip_normal.z:.3f}'
+                   f'_X:{v[0]:.3f}' \
+                   f'_Y:{v[1]:.3f}' \
+                   f'_Z:{v[2]:.3f}'
         super().__init__(name)
 
         task = self.create_and_add_task('align planes')
