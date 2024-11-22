@@ -3,9 +3,7 @@ from copy import deepcopy
 from enum import Enum
 from typing import Optional, Dict
 
-import giskard_msgs.msg as giskard_msgs
 import numpy as np
-from giskardpy_ros.ros1 import tfwrapper as tf
 from std_msgs.msg import ColorRGBA
 
 from data_types.data_types import PrefixName
@@ -154,7 +152,7 @@ class Reaching(ObjectGoal):
                 self.goal_pose = goal_pose
             except:
                 get_middleware().logwarn(f'Couldn\'t find {goal_pose.reference_frame}. Searching in tf.')
-                self.goal_pose = tf.lookup_pose('map', goal_pose)
+                self.goal_pose = god_map.world.compute_fk(god_map.world.search_for_link_name('map'), goal_pose)
 
             self.object_size = object_size
             self.reference_frame = 'base_footprint'
@@ -274,36 +272,65 @@ class GraspObject(ObjectGoal):
         self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
 
         if self.grasp == GraspTypes.ABOVE.value:
-            self.goal_vertical_axis.vector = self.standard_forward
-            self.goal_frontal_axis.vector = multiply_vector(self.standard_up, -1)
+            self.goal_vertical_axis.x = self.standard_forward.x
+            self.goal_vertical_axis.y = self.standard_forward.y
+            self.goal_vertical_axis.z = self.standard_forward.z
+            v = multiply_vector(self.standard_up, -1)
+            self.goal_frontal_axis.x = v.x
+            self.goal_frontal_axis.y = v.y
+            self.goal_frontal_axis.z = v.z
             self.goal_point.z += self.offsets.z
 
         elif self.grasp == GraspTypes.BELOW.value:
-            self.goal_vertical_axis.vector = multiply_vector(self.standard_forward, -1)
-            self.goal_frontal_axis.vector = self.standard_up
+            v = multiply_vector(self.standard_forward, -1)
+            self.goal_vertical_axis.x = v.x
+            self.goal_vertical_axis.y = v.y
+            self.goal_vertical_axis.z = v.z
+            self.goal_frontal_axis.x = self.standard_up.x
+            self.goal_frontal_axis.y = self.standard_up.y
+            self.goal_frontal_axis.z = self.standard_up.z
             self.goal_point.z -= self.offsets.z
 
         elif self.grasp == GraspTypes.FRONT.value:
-            self.goal_vertical_axis.vector = self.standard_up
-            self.goal_frontal_axis.vector = self.base_forward
+            self.goal_vertical_axis.x = self.standard_up.x
+            self.goal_vertical_axis.y = self.standard_up.y
+            self.goal_vertical_axis.z = self.standard_up.z
+            self.goal_frontal_axis.x = self.standard_up.x
+            self.goal_frontal_axis.y = self.standard_up.y
+            self.goal_frontal_axis.z = self.standard_up.z
 
             self.goal_point.z -= 0.01
 
         elif self.grasp == GraspTypes.LEFT.value:
-            self.goal_frontal_axis.vector = self.gripper_left
-            self.goal_vertical_axis.vector = self.standard_up
+            self.goal_vertical_axis.x = self.standard_up.x
+            self.goal_vertical_axis.y = self.standard_up.y
+            self.goal_vertical_axis.z = self.standard_up.z
+            self.goal_frontal_axis.x = self.gripper_left.x
+            self.goal_frontal_axis.y = self.gripper_left.y
+            self.goal_frontal_axis.z = self.gripper_left.z
 
         elif self.grasp == GraspTypes.RIGHT.value:
-            self.goal_frontal_axis.vector = multiply_vector(self.gripper_left, -1)
-            self.goal_vertical_axis.vector = self.standard_up
+            v = multiply_vector(self.gripper_left, -1)
+            self.goal_vertical_axis.x = self.standard_up.x
+            self.goal_vertical_axis.y = self.standard_up.y
+            self.goal_vertical_axis.z = self.standard_up.z
+            self.goal_frontal_axis.x = v.x
+            self.goal_frontal_axis.y = v.y
+            self.goal_frontal_axis.z = v.z
 
         if self.align == "vertical":
-            self.tip_vertical_axis.vector = self.gripper_left
+            self.tip_vertical_axis.x = self.gripper_left.x
+            self.tip_vertical_axis.y = self.gripper_left.y
+            self.tip_vertical_axis.z = self.gripper_left.z
 
         else:
-            self.tip_vertical_axis.vector = self.gripper_up
+            self.tip_vertical_axis.x = self.gripper_up.x
+            self.tip_vertical_axis.y = self.gripper_up.y
+            self.tip_vertical_axis.z = self.gripper_up.z
 
-        self.tip_frontal_axis.vector = self.gripper_forward
+        self.tip_frontal_axis.x = self.gripper_forward.x
+        self.tip_frontal_axis.y = self.gripper_forward.y
+        self.tip_frontal_axis.z = self.gripper_forward.z
 
         # Position
         self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link,
@@ -317,7 +344,7 @@ class GraspObject(ObjectGoal):
 
         # FIXME you can use orientation goal instead of two align planes
         # Align vertical
-        self.add_constraints_of_goal(AlignPlanes(name='APlanes1',
+        self.add_constraints_of_goal(AlignPlanes(name='APlanesVertical',
                                                  root_link=self.root_link,
                                                  tip_link=self.tip_link,
                                                  goal_normal=self.goal_vertical_axis,
@@ -329,7 +356,7 @@ class GraspObject(ObjectGoal):
                                                  end_condition=end_condition))
 
         # Align frontal
-        self.add_constraints_of_goal(AlignPlanes(name='APlanes2',
+        self.add_constraints_of_goal(AlignPlanes(name='APlanesFrontal',
                                                  root_link=self.root_link,
                                                  tip_link=self.tip_link,
                                                  goal_normal=self.goal_frontal_axis,
@@ -529,6 +556,7 @@ class Retracting(ObjectGoal):
 
 
 class AlignHeight(ObjectGoal):
+    goal_pose: cas.TransMatrix
     def __init__(self,
                  from_above: bool = False,
                  name: str = None,
@@ -572,8 +600,8 @@ class AlignHeight(ObjectGoal):
             god_map.world.search_for_link_name(goal_pose.reference_frame.short_name)
             self.goal_pose = goal_pose
         except:
-            get_middleware().logwarn(f'Couldn\'t find {goal_pose.header.frame_id}. Searching in tf.')
-            self.goal_pose = tf.lookup_pose('map', goal_pose)
+            get_middleware().logwarn(f'Couldn\'t find {goal_pose.reference_frame}. Searching in tf.')
+            self.goal_pose = god_map.world.compute_fk(god_map.world.search_for_link_name('map'), goal_pose)
 
         self.object_height = object_height
 
@@ -1248,10 +1276,10 @@ class GraspBarOffset(Goal):
         grasp_axis_offset = god_map.world.transform(self.root, grasp_axis_offset)
 
         tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
-        tip_grasp_axis.vector = tip_grasp_axis.norm()
+        tip_grasp_axis = tip_grasp_axis.norm()
 
         bar_axis = god_map.world.transform(self.root, bar_axis)
-        bar_axis.vector = bar_axis.norm()
+        bar_axis = bar_axis.norm()
 
         self.bar_axis = bar_axis
         self.tip_grasp_axis = tip_grasp_axis
