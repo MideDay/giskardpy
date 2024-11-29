@@ -77,16 +77,24 @@ class ExternalCollisionAvoidance(Goal):
                                         qp_limits_for_lba)
 
         upper_slack = cas.if_greater(actual_distance, hard_threshold,
-                                     cas.limit(soft_threshold - hard_threshold,
-                                               -qp_limits_for_lba,
-                                               qp_limits_for_lba),
+                                     lower_limit_limited + cas.max(0, actual_distance - (hard_threshold)),
                                      lower_limit_limited)
         # undo factor in A
-        upper_slack /= (sample_period * self.control_horizon)
+        upper_slack /= (sample_period)
 
         upper_slack = cas.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                      1e4,
                                      cas.max(0, upper_slack))
+
+        # if 'r_wrist_roll_link' in self.link_name:
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/actual_distance', actual_distance)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/hard_threshold', hard_threshold)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/soft_threshold', soft_threshold)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/upper_slack', upper_slack)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/lower_limit', lower_limit)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/qp_limits_for_lba', qp_limits_for_lba)
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/actual_distance > hard_threshold', cas.greater(actual_distance, hard_threshold))
+        #     god_map.debug_expression_manager.add_debug_expression(f'{self.name}/soft_threshold - hard_threshold', soft_threshold - hard_threshold)
 
         # weight = cas.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
@@ -189,13 +197,11 @@ class SelfCollisionAvoidance(Goal):
                                         qp_limits_for_lba)
 
         upper_slack = cas.if_greater(actual_distance, hard_threshold,
-                                     cas.limit(self.soft_threshold - hard_threshold,
-                                               -qp_limits_for_lba,
-                                               qp_limits_for_lba),
+                                     lower_limit_limited + cas.max(0, actual_distance - hard_threshold),
                                      lower_limit_limited)
 
         # undo factor in A
-        upper_slack /= (sample_period * self.control_horizon)
+        upper_slack /= (sample_period)
 
         upper_slack = cas.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                      1e4,
@@ -345,6 +351,8 @@ class CollisionAvoidanceHint(Goal):
 # avoid only something
 
 class CollisionAvoidance(Goal):
+    sub_goals = {}
+
     def __init__(self,
                  collision_entries: List[CollisionEntry],
                  name: Optional[str] = None,
@@ -364,7 +372,7 @@ class CollisionAvoidance(Goal):
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
-        if not cas.is_true(start_condition):
+        if not cas.is_true_symbol(start_condition):
             payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
                                                      start_condition=start_condition,
                                                      new_collision_matrix=self.collision_matrix)
@@ -397,7 +405,7 @@ class CollisionAvoidance(Goal):
                         soft_threshold = soft_threshold_override
                     else:
                         soft_threshold = configs[robot_name].external_collision_avoidance[joint_name].soft_threshold
-                    self.add_constraints_of_goal(ExternalCollisionAvoidance(robot_name=robot_name,
+                    ca = ExternalCollisionAvoidance(robot_name=robot_name,
                                                                             link_name=child_link,
                                                                             name_prefix=self.name,
                                                                             hard_threshold=hard_threshold,
@@ -406,7 +414,9 @@ class CollisionAvoidance(Goal):
                                                                             num_repeller=number_of_repeller,
                                                                             start_condition=self.start_condition,
                                                                             hold_condition=self.hold_condition,
-                                                                            end_condition=self.end_condition))
+                                                                            end_condition=self.end_condition)
+                    self.sub_goals[ca.name] = ca = ca
+                    self.add_constraints_of_goal(ca)
                     num_constrains += 1
         get_middleware().loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 

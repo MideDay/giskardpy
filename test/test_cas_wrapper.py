@@ -79,9 +79,9 @@ class TestExpression(unittest.TestCase):
         m = cas.Expression(cas.ca.SX(np.eye(4)))
         np.testing.assert_array_almost_equal(m.to_np(), np.eye(4))
         m = cas.Expression([1, 1])
-        np.testing.assert_array_almost_equal(m.to_np(), np.array([[1], [1]]))
+        np.testing.assert_array_almost_equal(m.to_np(), np.array([1, 1]))
         m = cas.Expression([np.array([1, 1])])
-        np.testing.assert_array_almost_equal(m.to_np(), np.array([[1, 1]]))
+        np.testing.assert_array_almost_equal(m.to_np(), np.array([1, 1]))
         m = cas.Expression(1)
         assert m.to_np() == 1
         m = cas.Expression([[1, 1], [2, 2]])
@@ -99,7 +99,7 @@ class TestExpression(unittest.TestCase):
         filter_[5] = True
         actual = e[filter_].to_np()
         expected = e_np[filter_]
-        assert np.all(actual.T[0] == expected)
+        assert np.all(actual.T == expected)
 
     def test_filter2(self):
         e_np = np.arange(16) * 2
@@ -191,33 +191,33 @@ class TestExpression(unittest.TestCase):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
         expr = cas.logic_and(cas.TrueSymbol, s1)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, s1)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.TrueSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, cas.TrueSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, cas.FalseSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(s1, s2)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
         expr = cas.logic_or(cas.FalseSymbol, s1)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
         expr = cas.logic_or(cas.TrueSymbol, s1)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.TrueSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.FalseSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.FalseSymbol, cas.FalseSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_lt(self):
         e1 = cas.Expression([1, 2, 3, -1])
@@ -619,7 +619,7 @@ class TestQuaternion(unittest.TestCase):
     def test_quaternion_from_matrix(self, q):
         matrix = giskard_math.rotation_matrix_from_quaternion(*q)
         q2 = giskard_math.quaternion_from_rotation_matrix(matrix)
-        q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np().T[0]
+        q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np().T
         self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
 
     @given(quaternion(), quaternion())
@@ -1933,23 +1933,23 @@ class TestCASWrapper(unittest.TestCase):
             ub = ub.to_np()
             b = np.hstack((lb, ub))
             lower_limits = (
-                tuple(lb.T[0][:ph].tolist()),
-                tuple(lb.T[0][ph:ph * 2].tolist()),
-                tuple(lb.T[0][-ph:].tolist())
+                tuple(lb.T[:ph].tolist()),
+                tuple(lb.T[ph:ph * 2].tolist()),
+                tuple(lb.T[-ph:].tolist())
             )
             upper_limits = (
-                tuple(ub.T[0][:ph].tolist()),
-                tuple(ub.T[0][ph:ph * 2].tolist()),
-                tuple(ub.T[0][-ph:].tolist())
+                tuple(ub.T[:ph].tolist()),
+                tuple(ub.T[ph:ph * 2].tolist()),
+                tuple(ub.T[-ph:].tolist())
             )
             lower_limits2 = (
-                tuple(lb.T[0][:ph].tolist()),
-                tuple(lb.T[0][ph:ph * 2].tolist()),
+                tuple(lb.T[:ph].tolist()),
+                tuple(lb.T[ph:ph * 2].tolist()),
                 (j_b,) * ph
             )
             upper_limits2 = (
-                tuple(ub.T[0][:ph].tolist()),
-                tuple(ub.T[0][ph:ph * 2].tolist()),
+                tuple(ub.T[:ph].tolist()),
+                tuple(ub.T[ph:ph * 2].tolist()),
                 (j_b,) * ph
             )
             current_values = (
