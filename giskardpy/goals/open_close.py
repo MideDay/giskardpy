@@ -56,7 +56,7 @@ class Open(Goal):
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                start_condition)
         else:
-            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk(self.handle_link, self.tip_link))
+            handle_T_tip = god_map.world.compute_fk(self.handle_link, self.tip_link)
 
         if special_door:
             monitor_goal_state = {self.joint_name: goal_joint_state - 0.1}
