@@ -21,7 +21,6 @@ if 'GITHUB_WORKFLOW' not in os.environ:
                      start_condition: cas.Expression = cas.TrueSymbol):
             super().__init__(run_call_in_thread=True,
                              name=name,
-                             stay_true=True,
                              start_condition=start_condition)
             self.force = force
 
@@ -35,12 +34,16 @@ if 'GITHUB_WORKFLOW' not in os.environ:
     class OpenHsrGripper(MoveHSRGripper):
         def __init__(self, *,
                      name: Optional[str] = None,
-                     start_condition: cas.Expression = cas.TrueSymbol):
+                     start_condition: cas.Expression = cas.TrueSymbol,
+                     hold_condition: cas.Expression = cas.FalseSymbol,
+                     end_condition: cas.Expression = cas.FalseSymbol):
             super().__init__(name=name, force=0.8, start_condition=start_condition)
 
 
     class CloseHsrGripper(MoveHSRGripper):
         def __init__(self, *,
                      name: Optional[str] = None,
-                     start_condition: cas.Expression = cas.TrueSymbol):
+                     start_condition: cas.Expression = cas.TrueSymbol,
+                     hold_condition: cas.Expression = cas.FalseSymbol,
+                     end_condition: cas.Expression = cas.FalseSymbol):
             super().__init__(name=name, force=-0.8, start_condition=start_condition)
