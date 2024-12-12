@@ -1,9 +1,7 @@
 import os
-import string
 from copy import copy
 from typing import Optional
 
-import geometry_msgs
 from rospy import wait_for_message
 
 from giskardpy.middleware import get_middleware
@@ -42,6 +40,8 @@ class PayloadForceTorque(PayloadMonitor):
         :param topic: the name of the topic
         :param name: name of the monitor class
         :param start_condition: the start condition of the monitor
+        :param hold_condition: the hold condition of the monitor
+        :param end_condition: the end condition of the monitor
         """
 
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
@@ -91,6 +91,8 @@ class PayloadForceTorque(PayloadMonitor):
     def __call__(self):
         rob_force = copy(self.rob_force)
         rob_torque = copy(self.rob_torque)
+        # if self.state is necessary here because otherwise the monitor will return false
+        # in next iteration after already having returned True
         if self.state:
             return
 
