@@ -7,6 +7,7 @@ import geometry_msgs
 from rospy import wait_for_message
 
 from giskardpy.middleware import get_middleware
+from giskardpy.symbol_manager import symbol_manager
 
 if 'GITHUB_WORKFLOW' not in os.environ:
     pass
@@ -28,6 +29,8 @@ class PayloadForceTorque(PayloadMonitor):
                  object_type: str,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
                  stay_true: bool = True):
         """
         The PayloadForceTorque class creates a monitor for the usage of the HSRs Force-Torque Sensor.
@@ -41,7 +44,7 @@ class PayloadForceTorque(PayloadMonitor):
         :param start_condition: the start condition of the monitor
         """
 
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition, run_call_in_thread=False)
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.object_type = object_type
         self.threshold_name = threshold_name
         self.topic = topic
@@ -67,12 +70,12 @@ class PayloadForceTorque(PayloadMonitor):
         """
         wrench.header.frame_id = self.sensor_frame
 
-        vstampF = geometry_msgs.msg.Vector3Stamped(header=wrench.header, vector=wrench.wrench.force)
-        vstampT = geometry_msgs.msg.Vector3Stamped(header=wrench.header, vector=wrench.wrench.torque)
+        vstampF = cas.Vector3.from_xyz(wrench.wrench.force.x, wrench.wrench.force.y, wrench.wrench.force.z, wrench.header.frame_id)
+        vstampT = cas.Vector3.from_xyz(wrench.wrench.torque.x, wrench.wrench.torque.y, wrench.wrench.torque.z, wrench.header.frame_id)
 
-        force_transformed = god_map.world.transform_vector(self.bf, vstampF)
+        force_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.bf, vstampF))
 
-        torque_transformed = god_map.world.transform_vector(self.bf, vstampT)
+        torque_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.bf, vstampT))
 
         # print("Force:", force_transformed.vector.x, force_transformed.vector.y, force_transformed.vector.z)
         # print("Torque:", torque_transformed.vector.x, torque_transformed.vector.y, torque_transformed.vector.z)
@@ -88,17 +91,21 @@ class PayloadForceTorque(PayloadMonitor):
     def __call__(self):
         rob_force = copy(self.rob_force)
         rob_torque = copy(self.rob_torque)
+        if self.state:
+            return
 
         if self.threshold_name == ForceTorqueThresholds.FT_GraspWithCare.value:
+            print(rob_force)
+            print(self.state)
 
             # case for grasping "normal" objects (namely Milk, Cereal and cups)
             if self.object_type == ObjectTypes.OT_Standard.value:
 
                 torque_threshold = 2
 
-                if abs(rob_torque.vector.y) > torque_threshold:
+                if abs(rob_torque[1]) > torque_threshold:
                     self.state = True
-                    get_middleware().loginfo(f'HIT GWC: TORQUE_Y:{rob_torque.vector.y}')
+                    get_middleware().loginfo(f'HIT GWC: TORQUE_Y:{rob_torque[1]}')
                 else:
                     self.state = False
 
@@ -107,9 +114,9 @@ class PayloadForceTorque(PayloadMonitor):
 
                 force_threshold = 85
 
-                if abs(rob_force.vector.z) > force_threshold:
+                if abs(rob_force[2]) > force_threshold:
                     self.state = True
-                    get_middleware().loginfo(f'HIT GWC: FORCE_Z:{rob_force.vector.z}')
+                    get_middleware().loginfo(f'HIT GWC: FORCE_Z:{rob_torque[2]}')
                 else:
                     self.state = False
 
@@ -119,10 +126,10 @@ class PayloadForceTorque(PayloadMonitor):
 
                 torque_threshold = 0.02
 
-                if (abs(rob_force.vector.y) > torque_threshold or
-                        abs(rob_torque.vector.y) > torque_threshold):
+                if (abs(rob_force[1]) > torque_threshold or
+                        abs(rob_force[1]) > torque_threshold):
                     self.state = False
-                    print(f'HIT GWC: {rob_force.vector.x};{rob_torque.vector.y}')
+                    print(f'HIT GWC: {rob_force[0]};{rob_torque[1]}')
                 else:
                     self.state = True
                     raise Exception("HSR failed to Grasp Object, Grasping threshold has been Undershot.")
@@ -132,9 +139,11 @@ class PayloadForceTorque(PayloadMonitor):
 
                 force_threshold = 50.0
 
-                if abs(rob_force.vector.z) > force_threshold:
+                if abs(rob_force[2]) > force_threshold:
                     self.state = True
-                    get_middleware().loginfo(rob_force.vector.z)
+                    print(rob_force[2])
+                    print(self.state)
+                    get_middleware().loginfo(rob_force[2])
                 else:
                     self.state = False
 
@@ -150,11 +159,11 @@ class PayloadForceTorque(PayloadMonitor):
 
                 force_z_threshold = 35
 
-                if abs(rob_force.vector.z) >= force_z_threshold:
+                if abs(rob_force[2]) >= force_z_threshold:
 
                     self.state = True
                     get_middleware().loginfo(
-                        f'HIT PLACING!: Z:{rob_force.vector.z}')
+                        f'HIT PLACING!: Z:{rob_force[2]}')
                 else:
                     self.state = False
 
@@ -163,11 +172,11 @@ class PayloadForceTorque(PayloadMonitor):
 
                 force_z_threshold = 35
 
-                if abs(rob_force.vector.z) >= force_z_threshold:
+                if abs(rob_force[2]) >= force_z_threshold:
 
                     self.state = True
                     get_middleware().loginfo(
-                        f'HIT CUTLERY!: Z:{rob_force.vector.z}')
+                        f'HIT CUTLERY!: Z:{rob_force[2]}')
                 else:
                     self.state = False
 
@@ -177,24 +186,24 @@ class PayloadForceTorque(PayloadMonitor):
                 #  TODO: Add proper placing logic for Plate
                 force_z_threshold = 1.0
 
-                if abs(rob_force.vector.z) >= force_z_threshold:
+                if abs(rob_force[2]) >= force_z_threshold:
 
                     self.state = True
-                    print(f'HIT PLACING: X:{rob_force.vector.x};Z:{rob_force.vector.z};Y:{rob_torque.vector.y}')
+                    print(f'HIT PLACING: X:{rob_force[0]};Z:{rob_force[2]};Y:{rob_force[1]}')
                 else:
                     self.state = False
-                    print(f'MISS PLACING!: X:{rob_force.vector.x};Z:{rob_force.vector.z};Y:{rob_torque.vector.y}')
+                    print(f'MISS PLACING!: X:{rob_force[0]};Z:{rob_force[2]};Y:{rob_force[1]}')
 
             # case for placing bowls
             elif self.object_type == ObjectTypes.OT_Bowl.value:
 
                 force_z_threshold = 35
 
-                if abs(rob_force.vector.z) >= force_z_threshold:
+                if abs(rob_force[2]) >= force_z_threshold:
 
                     self.state = True
                     get_middleware().loginfo(
-                        f'HIT PLACING: Z:{rob_force.vector.z}')
+                        f'HIT PLACING: Z:{rob_force[2]}')
                 else:
                     self.state = False
             # if no valid object_type has been declared in method parameters

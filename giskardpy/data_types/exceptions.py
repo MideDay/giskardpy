@@ -166,3 +166,7 @@ class ExecutionSucceededPrematurely(ExecutionException):
 # %% behavior tree exceptions
 class BehaviorTreeException(GiskardException):
     pass
+
+
+class ForceTorqueThresholdException(GiskardException):
+    pass
